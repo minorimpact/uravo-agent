@@ -36,12 +36,13 @@ print "DEBUG: ON\n" if ($debug);
 
 my $db = $uravo->{db};
 
-my $automations = { email=>{ runtime=>time(), function=>\&email_notifications},
-                    tsunami=>{ runtime=>time(), function=>\&purple_tsunami},
-                    rootcause=>{ runtime=>time(), function=>\&rootcause},
-                    depth=>{ runtime=>time(), function=>\&calculate_depth},
-                    cleanup=>{ runtime=>time(), function=>\&cleanup},
-    };
+my $automations = { 
+    email => { runtime=>time(), function=>\&email_notifications },
+    tsunami => { runtime=>time(), function=>\&purple_tsunami },
+    rootcause => { runtime=>time(), function=>\&rootcause },
+    depth => { runtime=>time(), function=>\&calculate_depth },
+    cleanup => { runtime=>time(), function=>\&cleanup },
+};
 
 while(1) {
     my $now = time();
@@ -113,12 +114,16 @@ while(1) {
         $where_str =~s/server_id/processed_alert.server_id/g;
 
         if ($action->{action} eq 'raise') {
+            # Increase the severity of the matching alerts.
             $sql = "UPDATE processed_alert JOIN server_type ON server_type.server_id=processed_alert.server_id SET Severity=Severity+1 WHERE Severity > 0 AND Severity < 5 AND $where_str";
         } elsif ($action->{action} eq 'lower') {
+            # Lower the severity of the matching alerts.
             $sql = "UPDATE processed_alert JOIN server_type ON server_type.server_id=processed_alert.server_id SET Severity=Severity-1 WHERE Severity > 1 AND $where_str";
         } elsif ($action->{action} eq 'discard') {
+            # Discard these matching alerts.
             $sql = "DELETE processed_alert from processed_alert JOIN server_type ON server_type.server_id=processed_alert.server_id WHERE $where_str";
         } elsif ($action->{action} eq 'hide') {
+            # Hide these alerts that match the regular expression.
             $sql = "UPDATE processed_alert JOIN server_type ON server_type.server_id=processed_alert.server_id SET SuppressEscl=5 WHERE $where_str";
         }
         if ($sql) {
@@ -161,6 +166,8 @@ while(1) {
     sleep 1;
 }
 
+# Generate a separate alert for if a whole mess of processes stop reporting
+# all at once.
 sub purple_tsunami {
     my $purple_count = $uravo->{db}->selectrow_hashref("SELECT COUNT(*) AS purples FROM alert WHERE AlertGroup = 'timeout' and Severity > 0")->{purples}|| 0;
     my $tsunami_warnings = $uravo->{db}->selectrow_hashref("SELECT COUNT(*) AS warnings FROM alert WHERE AlertGroup = 'purple_tsunami' and Severity > 0")->{warnings}|| 0;
@@ -171,6 +178,7 @@ sub purple_tsunami {
     }
 }
 
+# Send out email notifications.
 sub email_notifications {
     print "email_notification()\n"  if ($debug);
     my $alerts = $db->selectall_arrayref("SELECT * FROM alert WHERE Severity >= $uravo->{settings}->{minimum_severity} and SuppressEscl < 4 AND Acknowledged IS NULL and EventLevel >=10 and ParentIdentifier IS NULL", {Slice=>{}});
@@ -206,6 +214,7 @@ MESSAGE
     }
 }
 
+# Find rootcause alerts and make them the parent of symptom alerts.
 sub rootcause {
     my $rootcauses = $uravo->{db}->selectall_arrayref("SELECT * FROM rootcause ORDER BY causeorder", {Slice=>{}});
     foreach my $rootcause (@$rootcauses) {
@@ -232,6 +241,7 @@ sub rootcause {
     }
 }
 
+# Calculate the depth of any parent alerts.
 sub calculate_depth {
     my $sql = "SELECT * FROM alert WHERE SuppressEscl < 4 AND Severity >= " . ($uravo->{settings}->{minimum_severity}) . " AND EventLevel >= 10 AND ParentIdentifier IS NULL"; 
     my $alerts = $uravo->{db}->selectall_arrayref($sql, {Slice=>{}});
@@ -240,6 +250,7 @@ sub calculate_depth {
     }
 }
 
+# Set the depth of an alert.
 sub setDepth {
     my $alert = shift || return 0;
 

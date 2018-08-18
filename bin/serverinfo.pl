@@ -1,7 +1,6 @@
 #!/usr/bin/perl
 
 use strict;
-use lib '/usr/local/uravo/lib';
 use Uravo;
 use Getopt::Long;
 
