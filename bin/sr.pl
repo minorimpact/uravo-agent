@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 
 use lib '/usr/local/uravo/lib';
+use MinorImpact;
 use Uravo;
 
 use Getopt::Long;
@@ -8,10 +9,13 @@ use Getopt::Long;
 my $uravo = new Uravo;
 my @args;
 my $delim   = "\n";
+my $params = {};
 
-GetOptions("delim=s", \$delim,
-           "help", sub { usage(); },
-           "flat", sub { $delim=' ' },
+GetOptions("delim=s"   => \$delim,
+           "verbose"   => \$verbose,
+           "help"      => sub { usage(); },
+           "flat"      => sub { $delim=' ' },
+           "params=s%" => \$params
          ) || usage();
 
 
@@ -22,9 +26,6 @@ exit;
 
 sub main {
     my $action  = shift @ARGV;
-    my $params;
-
-    $params->{id_only} = 1;
 
     foreach my $param (@ARGV)  {
         if ($param =~ /^(\w+)=(\S+)$/) {
@@ -33,26 +34,77 @@ sub main {
             push @args, $param;
         }
     }
-    eval "do_$action(\$params, \@args);";
+    eval "do_$action(\$params)";
     print "$@\n" if ($@);
     print "\n";
 }
 
+sub do_del {
+    do_delete(@_);
+}
+
+sub do_delete {
+    my $params = shift;
+    my $arg = shift(@ARGV);
+    if ($arg =~/^events?$/ ) {
+        if (defined($params->{Identifier})) {
+            my $event = $uravo->getEvent($params->{Identifier});
+            print("deleting " . $event->toString() . "\n") if ($verbose);
+            $event->clear();
+         }
+     }
+}
+
+sub do_edit {
+    my $params = shift;
+    my $local_params = MinorImpact::cloneHash($params);
+
+    my $arg = shift(@ARGV);
+    if ($arg eq "server" ) {
+        if (defined($local_params->{server_id})) {
+            my $server = $uravo->getServer($params->{server_id});
+            if (defined($server)) {
+                print("updating " . $server->hostname());
+                $server->update($local_params);
+            }
+        }
+    }
+    elsif ($arg eq "type" ) {
+        if (defined($local_params->{server_id})) {
+            my $server = $uravo->getServer($params->{server_id});
+            if (defined($server)) {
+                print("updating " . $server->hostname());
+                $server->update($local_params);
+            }
+        }
+    }
+}
+
 sub do_list {
     my $params  = shift;
+    my $local_params = MinorImpact::cloneHash($params);
+    $local_params->{id_only} = 1;
     if (!defined($params->{silo}) && !defined($params->{silo_id})) {
-        $params->{all_silos} = 1;
+        $local_params->{all_silos} = 1;
     }
 
-    foreach my $arg (@_) {
+    foreach my $arg (@ARGV) {
         if ($arg eq "clusters") {
-            print join($delim, $uravo->getClusters($params, {id_only=>1}));
+            print join($delim, $uravo->getClusters($local_params, {id_only=>1}));
+        }
+        if ($arg eq "events" ) {
+            my @events = $uravo->getEvents($local_params, {id_only=>1});
+            my $output = "";
+            foreach my $event (@events) {
+                $output .= $event->toString() . $delim;
+            }
+            print $output;
         }
         if ($arg eq "servers" ) {
-            print join($delim, $uravo->getServers($params, {id_only=>1}));
+            print join($delim, $uravo->getServers($local_params, {id_only=>1}));
         }
         if ($arg eq "types" ) {
-            print join($delim, $uravo->getTypes($params, {id_only=>1}));
+            print join($delim, $uravo->getTypes($local_params, {id_only=>1}));
         }
     }
 }
@@ -76,6 +128,7 @@ COMMANDS
     One of the following must be passed to $shortname:
         list servers    
         list clusters
+        list events
         list types
 
 PARAMETERS
