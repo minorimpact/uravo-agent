@@ -39,6 +39,18 @@ sub main {
     print "\n";
 }
 
+sub do_add {
+    my $params = shift;
+    my $local_params = MinorImpact::cloneHash($params);
+
+    my $arg = shift(@ARGV);
+    $arg =~s/s$//;
+    if ($arg eq 'type') {
+        die("you must specify type_id") unless (defined($params->{type_id}));
+        Uravo::Serverroles::Type::add($params)
+    }
+}
+
 sub do_del {
     do_delete(@_);
 }
@@ -46,12 +58,20 @@ sub do_del {
 sub do_delete {
     my $params = shift;
     my $arg = shift(@ARGV);
-    if ($arg =~/^events?$/ ) {
+    $arg =~s/s$//;
+    if ($arg =~/^event$/ ) {
         if (defined($params->{Identifier})) {
             my $event = $uravo->getEvent($params->{Identifier});
             print("deleting " . $event->toString() . "\n") if ($verbose);
             $event->clear();
          }
+     }
+    elsif ($arg eq 'type' ) {
+        die("you must specify type_id") unless (defined($params->{type_id}));
+        my $type = $uravo->getType($params->{type_id});
+        die("invalid type") unless ($type);
+        print("deleting " . $type->toString() . "\n") if ($verbose);
+        $type->delete();
      }
 }
 
@@ -70,11 +90,11 @@ sub do_edit {
         }
     }
     elsif ($arg eq "type" ) {
-        if (defined($local_params->{server_id})) {
-            my $server = $uravo->getServer($params->{server_id});
-            if (defined($server)) {
-                print("updating " . $server->hostname());
-                $server->update($local_params);
+        if (defined($local_params->{type_id})) {
+            my $type = $uravo->getType($params->{type_id});
+            if (defined($type)) {
+                print("updating " . $type->name());
+                $type->update($local_params);
             }
         }
     }
@@ -89,10 +109,13 @@ sub do_list {
     }
 
     foreach my $arg (@ARGV) {
-        if ($arg eq "clusters") {
+	$arg =~s/s$//;
+	if ($arg eq "check") {
+	}
+        if ($arg eq "cluster") {
             print join($delim, $uravo->getClusters($local_params, {id_only=>1}));
         }
-        if ($arg eq "events" ) {
+        if ($arg eq "event" ) {
             my @events = $uravo->getEvents($local_params, {id_only=>1});
             my $output = "";
             foreach my $event (@events) {
@@ -100,10 +123,10 @@ sub do_list {
             }
             print $output;
         }
-        if ($arg eq "servers" ) {
+        if ($arg eq "server" ) {
             print join($delim, $uravo->getServers($local_params, {id_only=>1}));
         }
-        if ($arg eq "types" ) {
+        if ($arg eq "type" ) {
             print join($delim, $uravo->getTypes($local_params, {id_only=>1}));
         }
     }
