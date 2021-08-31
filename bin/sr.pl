@@ -42,11 +42,23 @@ sub do_add {
     my $params = shift;
     my $local_params = MinorImpact::cloneHash($params);
 
-    my $arg = shift(@ARGV);
+    my $arg = shift(@args);
     $arg =~s/s$//;
     if ($arg eq 'type') {
         die("you must specify type_id") unless (defined($params->{type_id}));
         Uravo::Serverroles::Type::add($params)
+    }
+    elsif ($arg eq 'server') {
+        die("you must specify server_id") unless (defined($params->{server_id}));
+        Uravo::Serverroles::Server::add($params)
+    }
+    elsif ($arg eq 'threshold') {
+        my $id = shift(@args);
+        die("you must specify a threshold") unless ($id);
+        my $id2 = shift(@args);
+        my $data = {AlertGroup=>$id, AlertKey=>$id2, %$local_params};
+        print("adding $id\n") if ($verbose);
+        $uravo->updateThresholds($data);
     }
 }
 
@@ -56,11 +68,11 @@ sub do_del {
 
 sub do_delete {
     my $params = shift;
-    my $arg = shift(@ARGV);
+    my $arg = shift(@args);
     $arg =~s/s$//;
     if ($arg =~/^event$/ ) {
-        if (length(@ARGV) > 0) {
-            $id = shift(@ARGV);
+        if (length(@args) > 0) {
+            $id = shift(@args);
         }
         elsif (defined($params->{Identifier})) {
             $id = $params->{Identifier};
@@ -86,7 +98,7 @@ sub do_edit {
     my $params = shift;
     my $local_params = MinorImpact::cloneHash($params);
 
-    my $arg = shift(@ARGV);
+    my $arg = shift(@args);
     if ($arg eq "server" ) {
         if (defined($local_params->{server_id})) {
             my $server = $uravo->getServer($params->{server_id});
@@ -105,6 +117,10 @@ sub do_edit {
             }
         }
     }
+    elsif ($arg eq 'threshold') {
+        unshift(@args, "threshold");
+        return do_add($params)
+    }
 }
 
 sub do_list {
@@ -115,10 +131,10 @@ sub do_list {
         $local_params->{all_silos} = 1;
     }
 
-    foreach my $arg (@ARGV) {
-	$arg =~s/s$//;
-	if ($arg eq "check") {
-	}
+    foreach my $arg (@args) {
+        $arg =~s/s$//;
+        if ($arg eq "check") {
+        }
         if ($arg eq "cluster") {
             print join($delim, $uravo->getClusters($local_params, {id_only=>1}));
         }
@@ -132,6 +148,17 @@ sub do_list {
         }
         if ($arg eq "server" ) {
             print join($delim, $uravo->getServers($local_params, {id_only=>1}));
+        }
+        if ($arg eq "threshold" ) {
+            my $server = $local_params->{server_id} ? $uravo->getServer($oocal_params->{server_id}) : $uravo->getServer();
+            my $monitoringValues = $server->getMonitoringValues($local_params);
+            for $key (keys %$monitoringValues) {
+                if ($monitoringValues->{$key}{red}){ # and !$monitoringValues->{$key}{disabled}) {
+                    print "$key: $monitoringValues->{$key}{yellow}/$monitoringValues->{$key}{red}";
+                    print $monitoringValues->{$key}{disabled} ? " DISABLED" : "";
+                    print $delim;
+                }
+            }
         }
         if ($arg eq "type" ) {
             print join($delim, $uravo->getTypes($local_params, {id_only=>1}));

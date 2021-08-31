@@ -77,6 +77,9 @@ while(1) {
         my $t1 = [gettimeofday];
         my $Serial = $alert->{Serial};
         print "Serial=$Serial, $alert->{Identifier}\n" if ($debug);
+        # TODO: check to see if AlertGroup exists in monitoring_default_values and add it if it doesn't --
+        #       it will be easier to adjust a threshold that already exists than to have to remember what
+        #       we called it.
 
         # Process the alert.
         $t0 = [gettimeofday];
