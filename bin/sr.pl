@@ -36,7 +36,6 @@ sub main {
     }
     eval "do_$action(\$params)";
     print "$@\n" if ($@);
-    print "\n";
 }
 
 sub do_add {
@@ -60,11 +59,19 @@ sub do_delete {
     my $arg = shift(@ARGV);
     $arg =~s/s$//;
     if ($arg =~/^event$/ ) {
-        if (defined($params->{Identifier})) {
-            my $event = $uravo->getEvent($params->{Identifier});
-            print("deleting " . $event->toString() . "\n") if ($verbose);
-            $event->clear();
-         }
+        if (length(@ARGV) > 0) {
+            $id = shift(@ARGV);
+        }
+        elsif (defined($params->{Identifier})) {
+            $id = $params->{Identifier};
+        }
+        elsif (defined($params->{Serial})) {
+            $id = $params->{Serial};
+        }
+        my $event = $uravo->getEvent($id) if ($id);
+        return unless $event;
+        print("deleting " . $event->toString() . "\n") if ($verbose);
+        $event->clear();
      }
     elsif ($arg eq 'type' ) {
         die("you must specify type_id") unless (defined($params->{type_id}));
