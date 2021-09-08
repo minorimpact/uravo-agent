@@ -65,7 +65,11 @@ sub do_add {
         $uravo->updateThreshold($local_params);
     }
     elsif ($arg eq 'type') {
-        die("you must specify type_id") unless (defined($local_params->{type_id}));
+        my $type_id = shift(@args) || $local_params->{type_id};
+        $local_params->{type_id} = $type_id;
+        my $type = $uravo->getType($type_id);
+        die "'$type_id' type already exists" if ($type);
+        die("you must specify type_id") unless (defined($type_id));
         Uravo::Serverroles::Type::add($local_params);
     }
 }
@@ -155,10 +159,12 @@ sub do_edit {
         return do_add($params)
     }
     elsif ($arg eq "type" ) {
-        if (defined($local_params->{type_id})) {
-            my $type = $uravo->getType($local_params->{type_id});
+        my $id = shift(@args) || (defined($local_params->{type_id})?$local_params->{type_id}:undef);
+        if ($id) {
+            my $type = $uravo->getType($id);
             if (defined($type)) {
-                print("updating " . $type->name());
+                print("updating " . $type->name() . "\n");
+                $local_params->{type_id} = $id;
                 $type->update($local_params);
             }
         }
@@ -209,12 +215,18 @@ sub do_list {
     }
     elsif ($arg eq "threshold" ) {
         my $server = $local_params->{server_id} ? $uravo->getServer($oocal_params->{server_id}) : $uravo->getServer();
-        my $monitoringValues = $server->getMonitoringValues($local_params);
-        for $key (sort keys %$monitoringValues) {
-            if ($monitoringValues->{$key}{red}){ # and !$monitoringValues->{$key}{disabled}) {
-                print "$key: $monitoringValues->{$key}{yellow}/$monitoringValues->{$key}{red}";
-                print $monitoringValues->{$key}{disabled} ? " DISABLED" : "";
-                print $delim;
+        if ($server) {
+            my $monitoringValues = $server->getMonitoringValues($local_params);
+            for $AlertGroup (sort keys %$monitoringValues) {
+                for $AlertKey (sort keys %{$monitoringValues->{$AlertGroup}}) {
+                    if (($monitoringValues->{$AlertGroup}{$AlertKey}{red} || $monitoringValues->{$AlertGroup}{$AlertKey}{yellow}) and !$monitoringValues->{$AlertGroup}{$AlertKey}{disabled}) {
+                        print "$AlertGroup";
+                        if ($AlertGroup ne $AlertKey) { print ",$AlertKey"; }
+                        print ": $monitoringValues->{$AlertGroup}{$AlertKey}{yellow}/$monitoringValues->{$AlertGroup}{$AlertKey}{red}";
+                        print $monitoringValues->{$AlertGroup}{$AlertKey}{disabled} ? " DISABLED" : "";
+                        print $delim;
+                    }
+                }
             }
         }
     }
@@ -282,6 +294,11 @@ EXAMPLES
         $ $shortname add threshold disk_temp /dev/sdb --params server_id=mincemeat red=115 yellow=110
         $ $shortname delete threshold disk_temp --params AlertKey=/dev/sdb
         $ $shortname list thresholds --params server_id=pumpkin
+        $ $shortname edit type --params type_id=linux module_id=+conn
+        $ $shoftname edit type centos --params  module_id=+log
+        $ $shortname edit server mincemeat --params type_id=linux,debian,outpost
+        $ $shortname add type linux
+        $ $shortname --verbose delete alert 1287493
 
 USAGE
     exit;
