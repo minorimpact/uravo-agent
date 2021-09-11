@@ -45,13 +45,15 @@ sub do_add {
     my $arg = shift(@args);
     $arg =~s/s$//;
     if ($arg eq 'server') {
-        die("you must specify server_id") unless (defined($local_params->{server_id}));
+        my $id = shift(@args) || $local_params->{server_id};
+        if ($id && !defined($local_params->{server_id})) { $local_params->{server_id} = $id; }
+        die("you must specify server_id") unless ($id);
         Uravo::Serverroles::Server::add($local_params);
     }
     elsif ($arg eq 'silo') {
-        my $id = shift(@args);
+        my $id = shift(@args) || $local_params->{silo_id};
         if ($id && !defined($local_params->{silo_id})) { $local_params->{silo_id} = $id; }
-        die("you must specify silo_id") unless (defined($local_params->{silo_id}));
+        die("you must specify silo_id") unless ($id);
         $silo = Uravo::Serverroles::Silo::add($local_params);
         print("added " . $silo->id() . "\n") if ($verbose && $silo);
     }
@@ -75,7 +77,7 @@ sub do_add {
 }
 
 sub do_del {
-    do_delete(@_);
+    return do_delete(@_);
 }
 
 sub do_delete {
@@ -124,65 +126,13 @@ sub do_delete {
 }
 
 sub do_edit {
-    my $params = shift;
-    my $local_params = MinorImpact::cloneHash($params);
-
-    my $arg = shift(@args);
-    $arg =~s/s$//;
-    if ($arg eq "bu") {
-        $id = shift(@args);
-        if ($id && !defined($local_params->{bu_id})) { $local_params->{bu_id} = $id; }
-        die("you must specify bu_id") unless (defined($local_params->{bu_id}));
-        $bu = new Uravo::Serverroles::BU($local_params->{bu_id});
-        $bu->update($local_params);
-        print("updated " . $bu->id() . "\n") if ($verbose);
-    }
-    elsif ($arg eq "server" ) {
-        my $server = $uravo->getServer();
-        if (defined($local_params->{server_id})) {
-            $server = $uravo->getServer($local_params->{server_id});
-        }
-        if (defined($server)) {
-            print("updating " . $server->hostname() . "\n");
-            $server->update($local_params);
-        }
-    }
-    elsif ($arg eq "silo") {
-        my $id = shift(@args) || (defined($local_params->{silo_id})?$local_params->{silo_id}:undef);
-        die("you must specify silo_id") unless ($id);
-        my $silo = new Uravo::Serverroles::Silo($id);
-        $silo->update($local_params);
-        print("updated " . $silo->id() . "\n") if ($verbose);
-    }
-    elsif ($arg eq 'threshold') {
-        unshift(@args, "threshold");
-        return do_add($params)
-    }
-    elsif ($arg eq "type" ) {
-        my $id = shift(@args) || (defined($local_params->{type_id})?$local_params->{type_id}:undef);
-        if ($id) {
-            my $type = $uravo->getType($id);
-            if (defined($type)) {
-                print("updating " . $type->name() . "\n");
-                $local_params->{type_id} = $id;
-                $type->update($local_params);
-            }
-        }
-    }
+    return do_update(@_);
 }
 
 sub do_info {
-    my $params  = shift;
-    my $local_params = MinorImpact::cloneHash($params);
-    my $arg = shift(@args);
-    if ($arg eq "server") {
-        my $id = shift(@args) || (defined($local_params->{server_id})?$local_params->{server_id}:$uravo->getServer()->id());
-        my $server = $uravo->getServer($id);
-        if ($server) {
-            print($server->info());
-        }
-    }
+    return do_show(@_);
 }
+
 sub do_list {
     my $params  = shift;
     my $local_params = MinorImpact::cloneHash($params);
@@ -204,6 +154,10 @@ sub do_list {
             $output .= $event->toString() . $delim;
         }
         print $output;
+    }
+    elsif ($arg eq "netblock" ) {
+        print join($delim, $uravo->getNetblocks($local_params, {id_only=>1}));
+        print "\n";
     }
     elsif ($arg eq "server" ) {
         print join($delim, $uravo->getServers($local_params, {id_only=>1}));
@@ -235,6 +189,82 @@ sub do_list {
     }
 }
 
+sub do_show {
+    my $params  = shift;
+    my $local_params = MinorImpact::cloneHash($params);
+    my $arg = shift(@args);
+    if ($arg eq "netblock") {
+        my $id = shift(@args) || (defined($local_params->{netblock_id})?$local_params->{netblock_id}:$uravo->getServer()->id());
+        my $netblock = $uravo->getNetblock($id);
+        if ($netblock) {
+            print($netblock->info());
+        }
+    }
+    elsif ($arg eq "server") {
+        my $id = shift(@args) || (defined($local_params->{server_id})?$local_params->{server_id}:$uravo->getServer()->id());
+        my $server = $uravo->getServer($id);
+        if ($server) {
+            print($server->info());
+        }
+    }
+}
+
+sub do_update {
+    my $params = shift;
+    my $local_params = MinorImpact::cloneHash($params);
+
+    my $arg = shift(@args);
+    $arg =~s/s$//;
+    if ($arg eq "bu") {
+        $id = shift(@args);
+        if ($id && !defined($local_params->{bu_id})) { $local_params->{bu_id} = $id; }
+        die("you must specify bu_id") unless (defined($local_params->{bu_id}));
+        $bu = new Uravo::Serverroles::BU($local_params->{bu_id});
+        $bu->update($local_params);
+        print("updated " . $bu->id() . "\n") if ($verbose);
+    }
+    elsif ($arg eq "server" ) {
+        my $server = $uravo->getServer();
+        if (defined($local_params->{server_id})) {
+            $server = $uravo->getServer($local_params->{server_id});
+        }
+        if (defined($server)) {
+            print("updating " . $server->hostname() . "\n");
+            $server->update($local_params);
+        }
+    }
+    elsif ($arg eq "netblock") {
+        my $id = shift(@args) || (defined($local_params->{netblock_id})?$local_params->{netblock_id}:undef);
+        die("you must specify netblock_id") unless ($id);
+        my $netblock = new Uravo::Serverroles::Netblock($id);
+        $netblock->update($local_params);
+        print("updated " . $netblock->id() . "\n") if ($verbose);
+    }
+    elsif ($arg eq "silo") {
+        my $id = shift(@args) || (defined($local_params->{silo_id})?$local_params->{silo_id}:undef);
+        die("you must specify silo_id") unless ($id);
+        my $silo = new Uravo::Serverroles::Silo($id);
+        $silo->update($local_params);
+        print("updated " . $silo->id() . "\n") if ($verbose);
+    }
+    elsif ($arg eq 'threshold') {
+        unshift(@args, "threshold");
+        return do_add($params)
+    }
+    elsif ($arg eq "type" ) {
+        my $id = shift(@args) || (defined($local_params->{type_id})?$local_params->{type_id}:undef);
+        if ($id) {
+            my $type = $uravo->getType($id);
+            if (defined($type)) {
+                print("updating " . $type->name() . "\n");
+                $local_params->{type_id} = $id;
+                $type->update($local_params);
+            }
+        }
+    }
+}
+
+
 sub usage {
     my $error       = shift;
     $0              =~/([^\/]+)$/;
@@ -243,19 +273,21 @@ sub usage {
     print "$error" if ($error);
     print "\n" unless (!$error || $error =~/\n$/);
     print <<USAGE;
-usage: $shortname [options] <command> [parameter [...] ]
+usage: $shortname [options] <command> [--params [...] ]
 
 OPTIONS
     --flat          Print the results horizontally (space delimited) rather than
                     vertically (\\n delimited).
     --help          Display this message.
+    --params        a list of 'name=value' pairs that can be passed to commands to set values for the actions.
 
 COMMANDS
     One of the following must be passed to $shortname:
-        list servers    
-        list clusters
-        list events
-        list types
+        add threshold
+        delete threshold
+        list clusters/events/netblocks/servers/thresholds/types
+        show server
+        update server/threshold/type
 
 PARAMETERS
     Parameters can be passed to various commands in the form of a 'name=value' pairs.
@@ -290,14 +322,17 @@ EXAMPLES
         '!'s.)
 
     Miscelaneous:
-        $ $shortname info server [server_id]
+        $ $shortname show server [server_id]
         $ $shortname add threshold disk_temp /dev/sdb --params server_id=mincemeat red=115 yellow=110
         $ $shortname delete threshold disk_temp --params AlertKey=/dev/sdb
+        $ $shortname list netblocks
         $ $shortname list thresholds --params server_id=pumpkin
-        $ $shortname edit type --params type_id=linux module_id=+conn
-        $ $shoftname edit type centos --params  module_id=+log
-        $ $shortname edit server mincemeat --params type_id=linux,debian,outpost
         $ $shortname add type linux
+        $ $shortname update type linux --params procs=+mysql:">0"
+        $ $shoftname update type linux --params  module_id=+log,procs
+        $ $shortname update server --params type_id=linux,ubuntu
+        $ $shortname update server mincemeat --params type_id=linux,debian,outpost
+        $ $shortname update netblock 192_168_0_0_24 --params silo_id=halsey
         $ $shortname --verbose delete alert 1287493
 
 USAGE
